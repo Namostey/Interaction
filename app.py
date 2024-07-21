@@ -7,25 +7,16 @@ import time
 import tkinter as tk
 from PIL import Image, ImageTk
 from threading import Timer
+from datetime import datetime
 
 # Load the Haar Cascade Classifier for face detection
 face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-
-# Function to generate a unique filename based on the current timestamp
-def generate_unique_filename(base_path, extension):
-    timestamp = time.strftime("%Y%m%d_%H%M%S")
-    return f"{base_path}_{timestamp}.{extension}"
 
 # Function to capture an image from the webcam
 def capture_image():
     cap = cv2.VideoCapture(0)
     if not cap.isOpened():
         print("Error: Could not open video capture device.")
-        return False
-
-    # Check if camera opened successfully
-    if not cap.isOpened():
-        print("Error: Camera not accessible.")
         return False
 
     root = tk.Tk()
@@ -65,26 +56,19 @@ def capture_image():
                 # Detect faces in the image
                 faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
                 
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                
                 if len(faces) == 0:
-                    print("No face detected. Capturing the full frame.")
-                    # Generate a unique filename for the full frame image
-                    full_frame_path = generate_unique_filename("images/full_frame", "jpg")
-                    cv2.imwrite(full_frame_path, frame)
-                    print(f"Full frame captured and saved to {full_frame_path}")
+                    image_path = f"images/full_frame_{timestamp}.jpg"
+                    cv2.imwrite(image_path, frame)
+                    print(f"Full frame captured and saved to {image_path}")
                 else:
-                    # Crop and save each detected face with a unique filename
+                    # Crop and save each detected face
                     for i, (x, y, w, h) in enumerate(faces):
                         face_img = frame[y:y+h, x:x+w]
-                        face_path = generate_unique_filename("images/cropped_face", "jpg")
+                        face_path = f"images/cropped_face_{timestamp}_{i}.jpg"
                         cv2.imwrite(face_path, face_img)
                         print(f"Face cropped and saved to {face_path}")
-
-                        # Generate hash for this face image
-                        face_hash = generate_image_hash(face_path)
-                        hash_path = generate_unique_filename("images/face_hash", "txt")
-                        with open(hash_path, 'w') as f:
-                            f.write(face_hash)
-                        print(f"Hash for face saved to {hash_path}")
                 
                 root.destroy()
         elif event.keysym == 'q':  # Press 'q' to quit
@@ -125,6 +109,33 @@ def generate_image_hash(image_path):
 
 # Capture image and save to specified path
 if capture_image():
-    print("Image capture and processing completed.")
+    # Generate hash from the captured image
+    # Find the latest image file for hashing
+    image_files = [f for f in os.listdir('images') if f.endswith('.jpg')]
+    if image_files:
+        latest_image = max(image_files, key=lambda f: os.path.getmtime(os.path.join('images', f)))
+        latest_image_path = os.path.join('images', latest_image)
+        start_time = time.time()
+        image_hash = generate_image_hash(latest_image_path)
+        end_time = time.time()
+        
+        if image_hash is not None:
+            if end_time - start_time > 2:
+                print("Warning: Hash generation took longer than 2 seconds.")
+            
+            # Write the hash to a file
+            with open('hash_output.txt', 'w') as f:
+                f.write(image_hash)
+            print("Hash written to hash_output.txt")
+            
+            # Run the Node.js script to send the hash to the smart contract
+            try:
+                subprocess.run(['node', 'Interaction.js'], check=True)
+            except subprocess.CalledProcessError as e:
+                print(f"Error running Node.js script: {e}")
+        else:
+            print("Hash generation failed.")
+    else:
+        print("No images found to generate hash.")
 else:
     print("Image capture failed.")

@@ -1,6 +1,16 @@
 const Web3 = require('web3');
 const fs = require('fs');
 
+// Read the hash file path from command-line arguments
+const hashFilePath = process.argv[2];
+if (!hashFilePath) {
+    console.error('No hash file path provided.');
+    process.exit(1);
+}
+
+// Read hash from file
+const dataHash = fs.readFileSync(hashFilePath, 'utf8').trim();
+
 const contractABI = require('./build/contracts/BinaryHash.json').abi;
 
 // Configure your Web3 provider
@@ -9,9 +19,6 @@ const web3 = new Web3(new Web3.providers.HttpProvider('http://localhost:7545'));
 // Replace with your deployed contract address and your account address
 const contractAddress = '0x62Edd39aeEA835f0410Ab5B4b25529FF259dB471';
 const fromAddress = '0x37ACB08A530DdAf3577cCE40c580976Df5515b3d';
-
-// Read hash from file (assuming it's stored in hash_output.txt by Python script)
-const hashFromFile = fs.readFileSync('hash_output.txt', 'utf8').trim();
 
 // Instantiate the contract
 const contract = new web3.eth.Contract(contractABI, contractAddress);
@@ -47,5 +54,5 @@ async function interactWithSmartContract(dataHash) {
     }
 }
 
-// Example usage: Call interactWithSmartContract function
-interactWithSmartContract(hashFromFile);
+// Call interactWithSmartContract function with the provided hash
+interactWithSmartContract(dataHash);
